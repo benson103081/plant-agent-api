@@ -1,5 +1,6 @@
 """Run with python -m uvicorn src.api.main:app --port 8000."""
 import math
+import asyncio
 import sys
 from contextlib import asynccontextmanager
 from dataclasses import asdict
@@ -11,6 +12,8 @@ from fastapi.responses import JSONResponse
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from paths import ROOT
 from src.agent.plant_agent import analyze
+from src.agent.discussion import discuss
+from src.api.discussion_schema import DiscussInput, DiscussOutput
 from src.api.schema import (Crop, PlantAgentInput, PlantAgentOutput, SearchResult,
                             SimulateOutput, SweepRow, WorldCropsOutput)
 from src.models.coefficients import Coefficients
@@ -27,6 +30,14 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Plant Agent API", lifespan=lifespan)
+
+
+@app.post("/discuss", response_model=DiscussOutput)
+async def discuss_endpoint(inp: DiscussInput, request: Request):
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(discuss, request.app.state.store, inp), timeout=42)
+    except TimeoutError:
+        raise HTTPException(504, "Plant 討論逾時，請保持世界暫停。")
 
 
 @app.exception_handler(ProviderError)

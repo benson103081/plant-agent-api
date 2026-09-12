@@ -25,10 +25,13 @@ def parse_json(text):
     raise ProviderError("LLM 未回傳有效 JSON 物件。")
 
 
-def complete(system, user):
-    result = post_json(ENDPOINT, {"model": MODEL, "messages": [
+def complete(system, user, max_tokens=None):
+    payload = {"model": MODEL, "messages": [
         {"role": "system", "content": system}, {"role": "user", "content": user},
-    ]}, timeout=35)
+    ]}
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+    result = post_json(ENDPOINT, payload, timeout=35)
     try:
         return parse_json(result["choices"][0]["message"]["content"])
     except (KeyError, IndexError, TypeError) as exc:
