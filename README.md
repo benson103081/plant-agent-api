@@ -4,7 +4,35 @@
 
 ## 從 GitHub 取得後的準備
 
-此 repository 不包含大型文獻索引、金鑰或本機虛擬環境。請向專案維護者取得三個索引檔，放到 `data/index/`：`chunks.jsonl`、`embeddings.npy`、`ids.json`。檔案大小與 SHA-256 見 `data/index-manifest.json`。缺少索引時 API 無法啟動；不可混用其他 embedding 模型產生的向量。
+此 repository 不包含大型文獻索引、金鑰或本機虛擬環境。請從 [索引資料 Release](https://github.com/benson103081/plant-agent-api/releases/tag/index-v1) 下載 `plant-agent-index-v1.zip`，在 Plant 專案根目錄解壓，得到 `data/index/chunks.jsonl`、`data/index/embeddings.npy`、`data/index/ids.json`。ZIP已包含 `data/index/` 層級，不要再解壓到該子目錄。檔案大小與 SHA-256 見 `data/index-manifest.json`。缺少索引時 API 無法啟動；不可混用其他 embedding 模型產生的向量。
+
+### 下載與核對索引
+
+附件約271 MB（259 MiB），解壓約371 MB（354 MiB），請預留至少650 MB空間。請下載 Release 的 **plant-agent-index-v1.zip**，不是 GitHub 自動產生的 Source code.zip。
+
+macOS / Linux，在專案根目錄執行：
+
+```bash
+curl -L --fail -o plant-agent-index-v1.zip https://github.com/benson103081/plant-agent-api/releases/download/index-v1/plant-agent-index-v1.zip
+unzip plant-agent-index-v1.zip -d .
+```
+
+Windows PowerShell，在專案根目錄執行：
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/benson103081/plant-agent-api/releases/download/index-v1/plant-agent-index-v1.zip" -OutFile "plant-agent-index-v1.zip"
+Expand-Archive -Path plant-agent-index-v1.zip -DestinationPath .
+```
+
+若整合專案將本服務放在 `plant_agent/`，就在該目錄執行，結果應為 `plant_agent/data/index/...`。
+
+壓縮包SHA-256：`ab818de08fc96c585015368494311176ead3e3a68e5a0f5ea196f764ce92efd7`。三個解壓檔的完整性可在安裝Python後檢查：
+
+```bash
+python3 scripts/verify_index.py
+```
+
+Windows使用 `python scripts/verify_index.py`。此檢查只用Python標準庫，不呼叫網路或付費API。
 
 macOS / Linux 首次安裝（需要 Python 3.10 以上）：
 
