@@ -26,15 +26,13 @@
 整體EU/tick = 每塊EU/tick × 存活種植地塊數
 ```
 
-## 2. Core原文件尚未同步之處
+## 2. 世界規則與模型估算的差異
 
-原文件說EU沒有物理映射，且要求每塊5 EU／tick。依最新Plant基準，每塊約5 EU是**一天**的用電；若每tick一小時，每塊需求約0.208339 EU，20塊約4.166781 EU，而非原本100 EU／tick。
+Core目前每塊5 EU／tick，20塊為100 EU／tick；Plant物理模型在1小時tick下估算約4.166781 EU。保留模型公式與EU換算，但模型不覆蓋遊戲規則。
 
-這不是待決定公式，而是**Core需同步接收規則與扣電時間**。如果Core採用新基準，`rules.irrigation.power_per_plot` 應使用約0.208339030887 EU／塊／1小時tick，並同步其規則版本與相關驗證；不能在舊5 EU扣除外再加Plant需求。此處僅是Plant交付口徑，未操作Core程式。
+`/discuss` 的資源分配一律採傳入 `rules.irrigation.power_per_plot`，不要求Core先改規則；差異列入公開說明，兩者不可相加。Core拒絕改規則後，Plant應回應該review並修改或撤回舊提案，繼續討論灌溉與水電安排。傳入tick時間不同也不再觸發固定衝突回覆。
 
-Plant `/discuss` 先用程式核對「傳入rules目前扣電」與「已定案Plant需求」。兩者或tick時間不符時直接產生明確的規則同步建議，附公開conflicts，不呼叫LLM或文獻服務、不自行修改快照、不假裝新數值已生效。這是可辨識的規則核對回覆，不是假的LLM分析結果。水、產氧與收穫仍按Core傳入rules，不趁電力更新改成文獻值。
-
-程式比較時容許每塊EU數值約0.01%的顯示取位誤差；若tick_hours不是1，會依傳入小時換算並另外指出與既定1小時基準不一致。
+製水合計同樣採世界扣電：若全田灌溉100 EU、補回174 L水需348 EU，條件式總需求為448 EU；不含crew與其他用途，也不代表已安排製水。
 
 ## 3. API格式與角色
 
@@ -47,7 +45,7 @@ Plant `/discuss` 先用程式核對「傳入rules目前扣電」與「已定案P
 - 第一輪fixture：`tests/fixtures/discuss_round1.json`，故意保留Core原始5 EU規則以測試衝突辨識。後續輪引用真實歷史proposal，拒絕虛構ID。
 - 世界、crew、plot允許附加狀態；資源固定四欄，驗證版本、ID及數值。Plant不改外層通訊欄位。
 
-規則核對一致後，三個文獻查詢加一次LLM產生精簡公開解釋；Plant需求由程式計算並附到explanation與content，而非只依靠LLM算術。衝突狀態先回規則同步建議，不同時生成相互矛盾的種植策略。
+每輪以三個文獻查詢加一次LLM產生精簡公開解釋；世界扣電與模型參考由程式分別計算。差異不再提前結束討論；LLM接收Core本輪reviews與歷史提案。
 
 ## 4. 錯誤與連線
 
@@ -63,12 +61,14 @@ PYTHONPATH=. .venv/bin/python tests/discuss_http.py
 PYTHONPATH=. .venv/bin/python tests/discuss_http.py --aligned
 ```
 
-原始fixture的兩輪測試核對舊規則衝突，完全本地運算；`--aligned` 使用人工同步電力規則的測試快照，會傳送範例世界與檢索文獻至OpenRouter。結果分別保存在忽略上傳的 `.tools/discuss-http-results.json` 與 `.tools/discuss-http-aligned.json`。測試快照不是實際Core已更新的證據。
+原始fixture保留遊戲5 EU規則，兩輪HTTP測試現在也會呼叫OpenRouter；`--aligned` 使用人工同步電力規則的測試快照，會傳送範例世界與檢索文獻至OpenRouter。結果分別保存在忽略上傳的 `.tools/discuss-http-results.json` 與 `.tools/discuss-http-aligned.json`。測試快照不是實際Core已更新的證據。
 
-剩餘僅是Core確認已採用上述每小時數值、提供雙方可連線的地址，並用實際Core程式跑第一輪與追問。Plant的面積、株數、EU換算、保守耗電公式均已定案。
+整合端需拉取最新版本並重啟Plant，再用實際Core程式跑第一輪與拒絕改規則的追問。Core可保留現行扣電規則；Plant的面積、株數、EU換算與保守模型公式仍作參考。
 
 製水比較亦由程式提供：範例植物灌溉174 L/tick低於製水上限250 L/tick，餘量76 L/tick；補回此水量需348 EU與34.8 OU。這些是既有rules的算術，不含其他用水，也不是已安排的製水工作。
 
 ## 本次修正驗證
 
-18項離線測試通過。保留舊規則的兩輪HTTP測試皆200，直接回傳規則同步建議，不呼叫LLM。使用已同步電力的人工測試快照，真實OpenRouter第一輪 15.11秒、第二輪 18.00秒，皆200、回覆格式與歷史引用正確；檢查耗電及製水比較無上述錯誤。這是單次本機契約與回覆檢查，不是Core實機串接或未來策略安全性的保證。
+以下為修正前的歷史測試：18項離線測試通過。當時舊規則會直接回固定同步建議，該行為現已移除。使用已同步電力的人工測試快照，真實OpenRouter第一輪 15.11秒、第二輪 18.00秒，皆200、回覆格式與歷史引用正確；檢查耗電及製水比較無上述錯誤。這是單次本機契約與回覆檢查，不是Core實機串接或未來策略安全性的保證。
+
+2026-09-12 修正驗證：19項離線測試通過，新增Core引用舊提案並拒絕改規則的回歸案例，確認會進入討論模型、保留review及原快照、按100 EU及448 EU合計計算。LLM採mock驗證，尚未重跑本版真實OpenRouter或Core端整合；歷史HTTP時間不代表本版效能。

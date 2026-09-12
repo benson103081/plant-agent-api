@@ -76,7 +76,7 @@ class DiscussionTests(unittest.TestCase):
         before=inp.model_dump()
         with patch('src.agent.discussion.complete',return_value=self.draft) as model:
             out=discuss(Store(),inp)
-            model.assert_not_called()
+            model.assert_called_once()
         self.assertEqual(inp.model_dump(),before)
         self.assertTrue(any('100.000000 EU' in x and '4.166781 EU' in x for x in out.explanation.conflicts))
         self.assertTrue(any('4.166781 EU' in x for x in out.content.evidence_and_unknowns))
@@ -84,6 +84,30 @@ class DiscussionTests(unittest.TestCase):
         summary=rule_summary(DiscussInput.model_validate(self.raw))
         self.assertTrue(summary['received_power_matches_plant'])
         self.assertEqual(policy_notes(summary)[1],[])
+
+    def test_core_rejection_continues_under_received_rules(self):
+        self.raw['content']['rules']['irrigation']['power_per_plot']=5
+        self.raw['round']=2
+        old={'message_id':'plant-old','sender':'plant','discussion_id':self.raw['discussion_id'],
+             'world_version':0,'round':1,'explanation':{'proposals':[{'proposal_id':'plant-energy-old','strategy':'請修改耗電規則'}]}}
+        self.raw['content']['previous_messages']=[old]
+        self.raw['explanation']['reviews']=[{'message_id':'plant-old','proposal_id':'plant-energy-old',
+            'disposition':'reject','assessment':'不更改世界規則，請依100 EU/tick討論。'}]
+        self.draft['explanation']['reviews']=[{'message_id':'plant-old','proposal_id':'plant-energy-old',
+            'disposition':'modify','assessment':'接受Core限制，依現行規則維持灌溉。'}]
+        inp=DiscussInput.model_validate(self.raw)
+        before=inp.model_dump()
+        with patch('src.agent.discussion.complete',return_value=self.draft) as model:
+            out=discuss(Store(),inp)
+        payload=json.loads(model.call_args.args[1])
+        self.assertEqual(payload['request']['explanation']['reviews'][0]['disposition'],'reject')
+        summary=payload['calculated_rule_summary']
+        self.assertEqual(summary['full_irrigation_power_EU_per_tick_under_received_rules'],100)
+        self.assertEqual(summary['water_production_for_plant_only']['plant_power_plus_replacement_water_power_EU_per_tick'],448)
+        self.assertAlmostEqual(summary['plant_energy']['total_EU_per_tick'],4.166780617742457)
+        self.assertEqual(out.explanation.reviews[0].proposal_id,'plant-energy-old')
+        self.assertEqual(out.explanation.proposals[0].strategy,'維持灌溉')
+        self.assertEqual(inp.model_dump(),before)
 
     def test_only_living_area_counts(self):
         plots=self.raw['content']['world']['plots']
